@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrustGate</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap">
+    <span class="wordmark">TrustGate</span>
+    <span class="tagline">Selective prediction with self-reported confidence</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="lede">
+    <h1 id="title">Loading evaluation…</h1>
+    <p id="subtitle" class="subtitle"></p>
+
+    <div class="toolbar">
+      <label>Evaluation <select id="preset"></select></label>
+      <label id="category-wrap" hidden>Category <select id="category"><option value="">All categories</option></select></label>
+      <span class="toolbar-actions">
+        <button id="import" type="button">Import JSON</button>
+        <button id="export" type="button">Export</button>
+        <input type="file" id="file" accept=".json,application/json" hidden>
+      </span>
+      <details class="live">
+        <summary>Run evaluation</summary>
+        <div class="live-body">
+          <label>Model <input id="model" class="code" value="gpt-5.4-mini" autocomplete="off" spellcheck="false"></label>
+          <label>Questions (MMLU-Pro sample) <select id="count"><option value="14">14 · 1 per category</option><option value="70">70 · 5 per category</option><option value="140">140 · all</option></select></label>
+          <p class="note" id="live-plan"></p>
+          <button id="live" type="button">Run</button>
+        </div>
+      </details>
+    </div>
+    <p id="message" role="status"></p>
+
+    <div id="empty">
+      <h2>No evaluation data</h2>
+      <p>No saved evaluation was found in <code>evaluations/</code>. Create one and reload the page:</p>
+      <pre>python3 evaluate_model.py --publish</pre>
+      <p>Alternatively, import a results file or use Run evaluation.</p>
+    </div>
+
+    <dl class="headline" id="headline"></dl>
+
+    <details class="run-details">
+      <summary>Dataset and run details</summary>
+      <dl id="details-list"></dl>
+    </details>
+  </section>
+
+  <section class="analysis" id="s-dist">
+    <h2>Confidence distribution</h2>
+    <div class="cols">
+      <figure>
+        <div class="plot" id="hist" data-aspect="0.58"></div>
+        <figcaption><b>Figure 1.</b> Number of predictions at each stated confidence, split by outcome. The vertical rule marks the current decision threshold.</figcaption>
+      </figure>
+      <div class="aside">
+        <p id="dist-text"></p>
+        <table class="numbers" id="conf-table"><thead><tr><th>Stated</th><th class="r">n</th><th class="r">Wrong</th><th class="r">Accuracy</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="analysis" id="s-cal">
+    <h2>Calibration</h2>
+    <div class="cols">
+      <figure>
+        <div class="plot" id="rel" data-aspect="0.78"></div>
+        <figcaption><b>Figure 2.</b> Reliability diagram with ten equal-width confidence bins. Each point is a bin; its area is proportional to the number of predictions. Stems show the gap to the diagonal of perfect calibration.</figcaption>
+      </figure>
+      <div class="aside">
+        <dl class="stats" id="cal-stats"></dl>
+        <p id="cal-text"></p>
+        <table class="numbers" id="bins-table"><thead><tr><th>Bin</th><th class="r">n</th><th class="r">Confidence</th><th class="r">Accuracy</th><th class="r">Gap</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="analysis" id="s-sel">
+    <h2>Selective prediction</h2>
+    <p class="intro">A policy answers when stated confidence reaches a threshold <i>t</i> and defers otherwise. Each wrong accepted answer costs <i>C</i><sub>w</sub>; each deferral costs <i>C</i><sub>d</sub>.</p>
+    <div class="controls">
+      <label for="threshold"><span>Threshold <i>t</i></span><output id="threshold-out">80%</output><input id="threshold" type="range" min="0" max="100" value="80"></label>
+      <label for="wrong"><span>Wrong answer <i>C</i><sub>w</sub></span><output id="wrong-out">10</output><input id="wrong" type="range" min="1" max="50" value="10"></label>
+      <label for="defer"><span>Deferral <i>C</i><sub>d</sub></span><output id="defer-out">1</output><input id="defer" type="range" min="0" max="10" step="0.5" value="1"></label>
+      <p class="note">If confidence were calibrated, the break-even threshold would be 1 − <i>C</i><sub>d</sub>/<i>C</i><sub>w</sub> = <span id="theory">—</span>. <button id="apply-theory" class="text" type="button">Use it</button> · <button id="reset" class="text" type="button">Reset</button></p>
+    </div>
+    <p id="sel-text" class="reading"></p>
+    <div class="pair">
+      <figure>
+        <div class="plot" id="rc" data-aspect="0.72"></div>
+        <figcaption><b>Figure 3.</b> Risk–coverage curve. Every attainable threshold is a point; tied confidence values must be accepted together. The ring marks the current threshold.</figcaption>
+      </figure>
+      <figure>
+        <div class="plot" id="cost-curve" data-aspect="0.72"></div>
+        <figcaption><b>Figure 4.</b> Total policy cost as a function of the threshold, <i>C</i><sub>w</sub> · wrong accepted + <i>C</i><sub>d</sub> · deferred.</figcaption>
+      </figure>
+    </div>
+    <table class="numbers wide" id="policy-table"><caption>Policies evaluated on the displayed sample</caption><thead><tr><th>Policy</th><th class="r">Threshold</th><th class="r">Coverage</th><th class="r">Wrong accepted</th><th class="r">Selective risk</th><th class="r">Cost</th></tr></thead><tbody></tbody></table>
+    <p class="note">The retrospective optimum is selected after seeing these outcomes. It describes this sample and is optimistic as an estimate of future performance.</p>
+  </section>
+
+  <section class="analysis" id="s-holdout">
+    <h2>Held-out evaluation</h2>
+    <p class="intro">To estimate how a threshold performs on unseen questions, it is chosen on one half of the data and applied, unchanged, to the other. The split was fixed before the model was run.</p>
+    <div id="holdout-body">
+      <div class="cols">
+        <figure>
+          <div class="plot" id="holdout-chart" data-aspect="0.36"></div>
+          <figcaption id="holdout-caption"></figcaption>
+        </figure>
+        <div class="aside">
+          <ol class="steps" id="holdout-steps"></ol>
+          <p id="holdout-verdict" class="verdict"></p>
+        </div>
+      </div>
+      <table class="numbers wide" id="holdout-table"><thead><tr><th>Policy</th><th>Data</th><th class="r">Threshold</th><th class="r">Coverage</th><th class="r">Wrong accepted</th><th class="r">Selective risk</th><th class="r">Cost</th></tr></thead><tbody></tbody></table>
+    </div>
+    <p id="holdout-missing" class="reading" hidden>This data has no calibration/test split, so no threshold can be validated here. All thresholds above are retrospective.</p>
+  </section>
+
+  <section class="analysis" id="s-pred">
+    <h2>Predictions</h2>
+    <div class="table-tools">
+      <label>Show <select id="filter"><option value="all">All</option><option value="wrong">Incorrect</option><option value="wrong-accepted">Incorrect but accepted</option><option value="accepted">Accepted</option><option value="deferred">Deferred</option><option value="new" hidden>Newly generated</option><option value="cached" hidden>From cache</option></select></label>
+      <span id="pred-count" class="note"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="numbers wide" id="pred-table"><thead><tr><th>ID</th><th>Question</th><th>Predicted</th><th>Gold</th><th class="r">Confidence</th><th>Outcome</th><th>Decision</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>Limitations.</b> One model, one prompt and one run on a small sample. Self-reported confidence is one of several ways to elicit uncertainty. Grading is exact match against the dataset key, which contains some known errors. Deferral is modelled as a fixed cost. Metrics describe the displayed sample and are not safety guarantees. See the README for the full methodology.</p>
+  </footer>
+</main>
+<div id="tip" role="tooltip" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>

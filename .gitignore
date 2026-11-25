@@ -1,0 +1,23 @@
+# Local results and caches (raw model outputs, provider-specific)
+results/
+trustgate-results*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.key
+
+# Editors, OS, temporary files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp
+*~
